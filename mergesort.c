@@ -82,8 +82,6 @@ void merge(row* L, row* R, row* result, int l, int r, int col){
 }
 
 void mergeSort(row* target, int col, int n){
-
-	printf("made it here merge0\n");
     int i, mid;
 
 
@@ -91,15 +89,15 @@ void mergeSort(row* target, int col, int n){
     	return;
     }
 
+
+
     mid = n/2;
 
     //split array into two parts
 
-    printf("made it here merge1\n");
+
     row* L = (row*)malloc(mid * sizeof(row));
-    printf("made it here merge1\n");
     row* R = (row*)malloc((n-mid) * sizeof(row));
-    printf("made it here merge2\n");
 
     // populate L and R
     for(i = 0; i < mid; i++){

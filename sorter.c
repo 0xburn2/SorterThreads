@@ -350,7 +350,7 @@ void populateStructTitles(char* dirName, char* selectedColumn){
 void exportToFile(char* selectedColumn, char* fileName, char* outputDir, int depth,
 		 int dUsed, int oUsed){
 
-	printf("this ran0\n");
+
 
 	//Export to a new file
 
@@ -388,7 +388,7 @@ void exportToFile(char* selectedColumn, char* fileName, char* outputDir, int dep
 		}*/
 
 		if ((strcmp(outputDir, "-n")) == 0) {
-			printf("this ran\n");
+
 			fp2 = fopen(fileName, "w+");
 
 		} else {
@@ -468,6 +468,8 @@ void beginSort(char* selectedColumn, char* fileName, char* outputDir, int depth,
 	regularRow.rowValue = (char*) malloc(sizeof(char) * 1000);
 	int currentRow = numberOfRows + 1;
 
+	fgets(regularRow.rowValue, 999, fp);
+
 	while (fgets(regularRow.rowValue, 999, fp) != NULL) {
 		regularRow.rowLength = strlen(regularRow.rowValue);
 		regularRow.fields = (char**) malloc(
@@ -480,7 +482,7 @@ void beginSort(char* selectedColumn, char* fileName, char* outputDir, int depth,
 	}
 
 	numberOfRows = currentRow;
-	printf("num of rows: %d\n", numberOfRows);
+	printf("Number of Rows: %d + Title Row\n", numberOfRows);
 	//printf("size: %d\n", sizeof(data[0]));
 
 	return;
@@ -514,6 +516,8 @@ void traverseDirectory(char* dirName, char* selectedColumn, char* outputDir,
 					&& strstr(itemName, "sorted") == NULL) {
 
 				printf("Found CSV: %s\n", itemName);
+				numberOfRows--;
+
 
 				//pid = fork();
 //--------------------Create thread instead
@@ -634,12 +638,12 @@ int main(int argc, char* argv[]) {
 	titleCompiled = 0;
 	shared = mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE,
 			MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	numberOfRows = -1;
+	numberOfRows = 0;
 
 	char* fileName;
 
 	//globla struct to store rows
-	data = (row*) malloc(sizeof(row) * 30000); //size matters
+	data = (row*) malloc(sizeof(row) * 40000); //size matters
 
 	// column to sort by
 	char* selectedColumn;
@@ -681,19 +685,13 @@ int main(int argc, char* argv[]) {
 		traverseDirectory("./", selectedColumn, "-n", depth, 0, 0);
 
 
-
-
-		printf("callig merge\n");
-		printf("columntoSort: %d\n", columnToSort);
-		printf("num rows: %d\n", numberOfRows);
 		mergeSort(data, columnToSort, numberOfRows);
-		printf("made it here2\n");
+
 
 
 		//AllFiles-sorted-<fieldname>.csv
 
 		fileName = "sortedFiles.csv";
-		printf("made it here3\n");
 		exportToFile(selectedColumn, fileName, "-n", depth,
 				 0, 0);
 
