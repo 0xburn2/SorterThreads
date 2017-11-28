@@ -26,6 +26,7 @@ int* threadCount;
 int firstTraverseCall;
 
 int ret;
+int success;
 pthread_mutexattr_t mattr;
 pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
 
@@ -276,7 +277,9 @@ void populateStructTitles(char* dirName, char* selectedColumn){
 
 						if (selectedColumnExist != 1) {
 							printf("Sorry, the column you entered doesn't exist in the csv\n");
-							return;
+							success = 0;
+							exit(0);
+							//return;
 						}
 
 						titleRow.sortedColumnNum = sortedColumnNum;
@@ -288,8 +291,8 @@ void populateStructTitles(char* dirName, char* selectedColumn){
 
 						if (sortedColumnNum != 28) {
 							printf("Sorry, the CSV input is not valid.\n");
-							printf("Sorting on process %d has failed due to invalid input.\n",
-									getpid());
+							//printf("Sorting on process %d has failed due to invalid input.\n",
+									//getpid());
 
 							//kill(getpid(), SIGTERM);
 							return;
@@ -343,8 +346,8 @@ void populateStructTitles(char* dirName, char* selectedColumn){
 							}
 
 						} else {
-							printf("got here\n");
-							printf("%s\n", dirPath);
+							//printf("got here\n");
+							//printf("%s\n", dirPath);
 
 							populateStructTitles(dirPath, selectedColumn);
 
@@ -369,7 +372,7 @@ void populateStructTitles(char* dirName, char* selectedColumn){
 
 }
 
-void exportToFile(char* selectedColumn, char* fileName, char* outputDir, int depth,
+void exportToFile(char* selectedColumn, char* dirName, char* fileName, char* outputDir, int depth,
 		 int dUsed, int oUsed){
 
 
@@ -381,7 +384,7 @@ void exportToFile(char* selectedColumn, char* fileName, char* outputDir, int dep
 
 	char* new_str;
 	char* tempString = fileName;
-	//	tempString[strlen(tempString) - 4] = 0;
+		//tempString[strlen(tempString) - 4] = 0;
 
 		/*char* tempString2 = ogFileName;
 		tempString2[strlen(tempString2) - 4] = 0;*/
@@ -411,17 +414,31 @@ void exportToFile(char* selectedColumn, char* fileName, char* outputDir, int dep
 
 		if ((strcmp(outputDir, "-n")) == 0) {
 
-			fp2 = fopen(fileName, "w+");
+			char* fullPath = malloc(
+								strlen(dirName) + strlen(fileName) + (strlen("../") * depth)
+										+ 2);
+						strcpy(fullPath, "");
+
+						strcat(fullPath, dirName);
+						//printf("%s\n", outputDir);
+						strcat(fullPath, fileName);
+
+						//printf("Full output path: %s\n", fullPath);
+						//printf("outputdir: %s\n", outputDir);
+						//printf("newstr: %s\n", new_str);
+						//printf("OGstr: %s\n", ogFileName);
+
+						fp2 = fopen(fullPath, "w+");
 
 		} else {
 			char* fullPath = malloc(
-					strlen(outputDir) + strlen(new_str) + (strlen("../") * depth)
+					strlen(outputDir) + strlen(fileName) + (strlen("../") * depth)
 							+ 2);
 			strcpy(fullPath, "");
 
 			strcat(fullPath, outputDir);
 			//printf("%s\n", outputDir);
-			strcat(fullPath, new_str);
+			strcat(fullPath, fileName);
 
 			//printf("Full output path: %s\n", fullPath);
 			//printf("outputdir: %s\n", outputDir);
@@ -671,6 +688,7 @@ int main(int argc, char* argv[]) {
 	firstTraverseCall = 0;
 	ret = 0;
 	ret = pthread_mutex_init(&m, &mattr);
+	success = -1;
 
 	titleCompiled = 0;
 	threadCount = (int *)malloc(sizeof(int));
@@ -680,9 +698,6 @@ int main(int argc, char* argv[]) {
 
 	char* fileName;
 
-	 printf("Initial TID: %ld\n", (unsigned long int)pthread_self());
-	 printf("TIDS of all child threads: ");
-	  fflush(stdout);
 	  *threadCount = -1;
 	  pthread_t * threads = (pthread_t *)malloc(sizeof(pthread_t) * 2048);
 
@@ -694,28 +709,197 @@ int main(int argc, char* argv[]) {
 	//int initialPid = getpid();
 	int depth = 0;
 
-	if (strcmp(argv[1], "-c") != 0) {
-		printf("Sorry, you must use the -c flag to declare a column\n");
-		exit(2);
-	}
+
 
 	if (argc != 3 && argc != 5 && argc != 7) {
 		printf("Invalid argument size\n");
 		return 1;
 	}
 
-	//printf("Initial PID: %d\n", initialPid);
-	//printf("PIDs of all child processes: ");
-	//fflush(stdout);
-
-	selectedColumn = argv[2];
-
-	if (argc == 3) {
-
-		//wait(NULL);
 
 
-		populateStructTitles("./", selectedColumn);
+	selectedColumn = "noColumnSelected";
+
+	//Set C flag
+	if (strcmp(argv[1], "-c") == 0){
+		selectedColumn = argv[2];
+	} if (argc > 3){
+		if (strcmp(argv[3], "-c") == 0){
+		selectedColumn = argv[4];
+		}
+	} if (argc > 5){
+		if (strcmp(argv[5], "-c") == 0){
+		selectedColumn = argv[6];
+		}
+	}
+
+	if (strcmp(selectedColumn, "noColumnSelected") == 0){
+		printf("Sorry, the -c flag is mandatory. Please use the -c flag to declare a column to sort\n");
+		return -1;
+	}
+
+
+	 printf("Initial TID: %ld\n", (unsigned long int)pthread_self());
+		 printf("TIDS of all child threads: ");
+		  fflush(stdout);
+
+
+	struct dirArg_struct *dirArgs1 = malloc(sizeof(struct dirArg_struct));
+
+				dirArgs1->dirName = "./";
+				dirArgs1->selectedColumn = selectedColumn;
+				dirArgs1->outputDir = "-n";
+				dirArgs1->depth = depth;
+				dirArgs1->dUsed = 0;
+				dirArgs1->oUsed = 0;
+				dirArgs1->threads = threads;
+
+	//Set O Flag
+
+	if (strcmp(argv[1], "-o") == 0){
+
+		dirArgs1->oUsed = 1;
+		char* outputDir = malloc(
+							strlen(argv[4] + strlen("./") + strlen("/") + 2));
+
+					if (argv[2][0] == '/') {
+
+						strcpy(outputDir, ".");
+						strcat(outputDir, argv[2]);
+						strcat(outputDir, "/");
+
+						dirArgs1->outputDir = outputDir;
+						//printf("slash at beginning: %s\n", startingPath);
+					} else {
+
+						strcpy(outputDir, argv[2]);
+						strcat(outputDir, "/");
+						dirArgs1->outputDir = outputDir;
+					}
+
+					if (strlen(argv[2]) == 0) {
+						printf("error");
+						return 0;
+					}
+
+	} else if (argc > 3){
+		if (strcmp(argv[3], "-o") == 0){
+		dirArgs1->oUsed = 1;
+		char* outputDir = malloc(
+							strlen(argv[4] + strlen("./") + strlen("/") + 2));
+
+					if (argv[4][0] == '/') {
+
+						strcpy(outputDir, ".");
+						strcat(outputDir, argv[4]);
+						strcat(outputDir, "/");
+						dirArgs1->outputDir = outputDir;
+						//printf("slash at beginning: %s\n", startingPath);
+					} else {
+
+						strcpy(outputDir, argv[4]);
+						strcat(outputDir, "/");
+						dirArgs1->outputDir = outputDir;
+					}
+
+					if (strlen(argv[4]) == 0) {
+						printf("error");
+						return 0;
+					}
+		}
+	} if (argc > 5){
+		//printf("it was greater\n");
+		if ((strcmp(argv[5], "-o") == 0)){
+		dirArgs1->oUsed = 1;
+		char* outputDir = malloc(
+							strlen(argv[6] + strlen("./") + strlen("/") + 2));
+
+					if (argv[6][0] == '/') {
+
+						strcpy(outputDir, ".");
+						strcat(outputDir, argv[6]);
+						strcat(outputDir, "/");
+						dirArgs1->outputDir = outputDir;
+						//printf("slash at beginning: %s\n", startingPath);
+					} else {
+
+						strcpy(outputDir, argv[6]);
+						strcat(outputDir, "/");
+						dirArgs1->outputDir = outputDir;
+					}
+
+					if (strlen(argv[6]) == 0) {
+						printf("error");
+						return 0;
+					}
+		}
+	}
+
+	//Set D Flag
+
+	if (strcmp(argv[1], "-d") == 0){
+		dirArgs1->dUsed = 1;
+		char* startingPath = malloc(
+							strlen(argv[2] + strlen("./") + strlen("/") + 2));
+
+					if (argv[2][0] == '/') {
+
+						strcpy(startingPath, ".");
+						strcat(startingPath, argv[2]);
+						strcat(startingPath, "/");
+						dirArgs1->dirName = startingPath;
+						//printf("slash at beginning: %s\n", startingPath);
+					} else {
+
+						strcpy(startingPath, argv[2]);
+						strcat(startingPath, "/");
+						dirArgs1->dirName = startingPath;
+					}
+
+	} if (argc > 3){
+		if ((strcmp(argv[3], "-d") == 0)){
+		dirArgs1->dUsed = 1;
+		char* startingPath = malloc(
+							strlen(argv[4] + strlen("./") + strlen("/") + 2));
+
+					if (argv[4][0] == '/') {
+
+						strcpy(startingPath, ".");
+						strcat(startingPath, argv[4]);
+						strcat(startingPath, "/");
+						dirArgs1->dirName = startingPath;
+						//printf("slash at beginning: %s\n", startingPath);
+					} else {
+
+						strcpy(startingPath, argv[4]);
+						strcat(startingPath, "/");
+						dirArgs1->dirName = startingPath;
+					}
+		}
+	} if (argc > 5){
+		if ((strcmp(argv[5], "-d") == 0 )){
+		dirArgs1->dUsed = 1;
+		char* startingPath = malloc(
+							strlen(argv[6] + strlen("./") + strlen("/") + 2));
+
+					if (argv[4][0] == '/') {
+
+						strcpy(startingPath, ".");
+						strcat(startingPath, argv[6]);
+						strcat(startingPath, "/");
+						dirArgs1->dirName = startingPath;
+						//printf("slash at beginning: %s\n", startingPath);
+					} else {
+
+						strcpy(startingPath, argv[6]);
+						strcat(startingPath, "/");
+						dirArgs1->dirName = startingPath;
+					}
+	}
+	}
+
+
+		populateStructTitles(dirArgs1->dirName, selectedColumn);
 		int columnToSort = 0;
 		while (columnToSort < titleRow.sortedColumnNum) {
 			if (strcmp(titleRow.fields[columnToSort], selectedColumn) == 0) {
@@ -724,17 +908,13 @@ int main(int argc, char* argv[]) {
 			columnToSort++;
 		}
 
-		struct dirArg_struct *dirArgs1 = malloc(sizeof(struct dirArg_struct));
-
-		dirArgs1->dirName = "./";
-		dirArgs1->selectedColumn = selectedColumn;
-		dirArgs1->outputDir = "-n";
-		dirArgs1->depth = depth;
-		dirArgs1->dUsed = 0;
-		dirArgs1->oUsed = 0;
-		dirArgs1->threads = threads;
-
-
+		/*printf("dirArgs dUsed: %d\n", dirArgs1->dUsed);
+		printf("dirArgs oUsed: %d\n", dirArgs1->oUsed);
+		printf("dirArgs depth: %d\n", dirArgs1->depth);
+		printf("dirArgs dirName: %s\n", dirArgs1->dirName);
+		printf("dirArgs fileName: %s\n", dirArgs1->fileName);
+		printf("dirArgs outputDir: %s\n", dirArgs1->outputDir);
+		printf("dirArgs selectedCoulmn: %s\n", dirArgs1->selectedColumn);*/
 
 		traverseDirectory(dirArgs1);
 
@@ -746,148 +926,35 @@ int main(int argc, char* argv[]) {
 
 		    }
 
+
 		mergeSort(data, columnToSort, numberOfRows);
 
-		char* outputName = malloc(20 + strlen(selectedColumn) + 10);
+
+		char* outputName = malloc(20 + strlen(dirArgs1->selectedColumn) + 10);
 		outputName[0] = '\0';
 		strcat(outputName, "AllFiles-sorted-");
-		strcat(outputName, selectedColumn);
+		strcat(outputName, dirArgs1->selectedColumn);
 		strcat(outputName, ".csv");
 
 		//AllFiles-sorted-<fieldname>.csv
-		fileName = "sortedFiles.csv";
-		exportToFile(selectedColumn, outputName, "-n", depth,
-				 0, 0);
+		//fileName = "sortedFiles.csv";
+
+		if (success != 0){
+
+			/*printf("dirArgs dirName: %s\n", dirArgs1->dirName);
+					printf("dirArgs fileName: %s\n", outputName);
+					printf("dirArgs outputDir: %s\n", dirArgs1->outputDir);
+					printf("dirArgs oUsed: %d\n", dirArgs1->oUsed);
+					printf("dirArgs selectedCoulmn: %s\n", dirArgs1->selectedColumn);*/
+
+
+
+
+		exportToFile(dirArgs1->selectedColumn, dirArgs1->dirName, outputName, dirArgs1->outputDir, dirArgs1->depth,
+				 dirArgs1->dUsed, dirArgs1->oUsed);
+		}
 
 		printf("\n\nTotal number of threads: %d\n", *threadCount + 1);
-
-	}
-
-	if (argc == 5) {
-
-		if (strcmp(argv[3], "-d") == 0) {
-			//printf("Start from new directory: %s \n", argv[4]);
-
-			char* startingPath = malloc(
-					strlen(argv[4] + strlen("./") + strlen("/") + 2));
-
-			if (argv[4][0] == '/') {
-
-				strcpy(startingPath, ".");
-				strcat(startingPath, argv[4]);
-				strcat(startingPath, "/");
-				//printf("slash at beginning: %s\n", startingPath);
-			} else {
-
-				strcpy(startingPath, argv[4]);
-				strcat(startingPath, "/");
-			}
-
-			//traverseDirectory(startingPath, selectedColumn, "-n", depth, 0, 0);
-			/*if (initialPid == getpid()) {
-				wait();
-				printf("\nTotal number of processes: %d\n", *shared + 1);
-			}*/
-			exit(0);
-
-		} else if (strcmp(argv[3], "-o") == 0) {
-			//printf("Output to this directory: %s\n", argv[4]);
-
-			char* outputDir = malloc(
-					strlen(argv[4] + strlen("./") + strlen("/") + 2));
-
-			if (argv[4][0] == '/') {
-
-				strcpy(outputDir, ".");
-				strcat(outputDir, argv[4]);
-				strcat(outputDir, "/");
-				//printf("slash at beginning: %s\n", startingPath);
-			} else {
-
-				strcpy(outputDir, argv[4]);
-				strcat(outputDir, "/");
-			}
-
-			if (strlen(argv[4]) == 0) {
-				printf("error");
-				return 0;
-			}
-
-			//traverseDirectory("./", selectedColumn, outputDir, depth, 0, 1);
-			/*if (initialPid == getpid()) {
-				wait();
-				printf("\nTotal number of processes: %d\n", *shared + 1);
-			}*/
-			exit(0);
-
-			//exit(2);
-		} else {
-			printf("Wrong input\n");
-			return 0;
-		}
-
-	}
-
-	if (argc == 7) {
-
-		if ((strcmp(argv[3], "-d") == 0) && (strcmp(argv[5], "-o") == 0)) {
-			/*printf(
-					"Start from new directory: %s and export to this directory: %s \n",
-					argv[4], argv[6]);*/
-
-			char* startingPath = malloc(
-					strlen(argv[4] + strlen("./") + strlen("/") + 2));
-
-			if (argv[4][0] == '/') {
-
-				strcpy(startingPath, ".");
-				strcat(startingPath, argv[4]);
-				strcat(startingPath, "/");
-				//printf("slash at beginning: %s\n", startingPath);
-			} else {
-
-				strcpy(startingPath, argv[4]);
-				strcat(startingPath, "/");
-			}
-
-
-
-			char* outputDir = malloc(
-					strlen(argv[6] + strlen("./") + strlen("/") + 2));
-
-			if (argv[6][0] == '/') {
-
-				strcpy(outputDir, ".");
-				strcat(outputDir, argv[4]);
-				strcat(outputDir, "/");
-				//printf("slash at beginning: %s\n", startingPath);
-			} else {
-
-				strcpy(outputDir, argv[6]);
-				strcat(outputDir, "/");
-			}
-
-			if (strlen(argv[6]) == 0) {
-				printf("error");
-								return 0;
-			}
-
-			//printf("starting path: %s\n", startingPath);
-			//printf("output dir: %s\n", outputDir);
-
-			//traverseDirectory(startingPath, selectedColumn, outputDir, depth, 1, 1);
-		/*	if (initialPid == getpid()) {
-				wait();
-				printf("\nTotal number of processes: %d\n", *shared + 1);
-			}*/
-			exit(0);
-
-		} else {
-			printf("Wrong input\n");
-			return 0;
-		}
-
-	}
 
 	return 0;
 }
