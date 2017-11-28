@@ -4,7 +4,7 @@
  * Fall 2017
  */
 
-#include "Sorter.h"
+#include "sorter_thread.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>

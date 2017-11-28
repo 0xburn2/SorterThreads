@@ -10,7 +10,7 @@ Had to include mergesort.c in the compile command because C didn't know the two 
 if that was part of the requirements). So here is the command you must run in order to compile our code!
 
 Compile Command:
-gcc -o sorter mergesort.c sorter.c
+gcc -pthread -o sorter_thread mergesort.c sorter_thread.c
 
 Execution Command:
 ./sorter -c COLUMNNAME
