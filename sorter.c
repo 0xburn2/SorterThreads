@@ -16,14 +16,36 @@
 #include <errno.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <pthread.h>
 
 int* shared;
 int titleCompiled;
 int sortedColumnNum;
 int numberOfRows;
+int* threadCount;
+int firstTraverseCall;
+
+int ret;
+pthread_mutexattr_t mattr;
+pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
 
 row titleRow;
 row *data;
+
+struct arg_struct {
+	char* fileName;
+};
+
+struct dirArg_struct {
+	char* dirName;
+	char* fileName;
+	char* selectedColumn;
+	char* outputDir;
+	int depth;
+	int dUsed;
+	int oUsed;
+	pthread_t* threads;
+};
 
 int isString(char* string) {
 
@@ -451,14 +473,24 @@ void exportToFile(char* selectedColumn, char* fileName, char* outputDir, int dep
 
 }
 
-void beginSort(char* selectedColumn, char* fileName, char* outputDir, int depth,
-		char* ogFileName, int dUsed, int oUsed) {
+void* beginSort(void *args) {
+
+	pthread_mutex_lock(&m);
+	numberOfRows--;
+	struct arg_struct *arg = args;
+
+	printf("%ld,",(unsigned long int)pthread_self());
+
+
+	//printf("%s\n", arg->fileName);
 
 	//printf("%s\n", "Begin sort called");
 
 	FILE* fp;
 
-		fp = fopen(fileName, "r");
+		fp = fopen(arg->fileName, "r");
+
+
 
 
 		//wait(3);
@@ -466,46 +498,62 @@ void beginSort(char* selectedColumn, char* fileName, char* outputDir, int depth,
 	// non title rows, aka all the other ones
 	row regularRow;
 	regularRow.rowValue = (char*) malloc(sizeof(char) * 1000);
+
+	//printf("number of rows: %d\n", numberOfRows);
 	int currentRow = numberOfRows + 1;
+
+
 
 	fgets(regularRow.rowValue, 999, fp);
 
+
 	while (fgets(regularRow.rowValue, 999, fp) != NULL) {
+
 		regularRow.rowLength = strlen(regularRow.rowValue);
 		regularRow.fields = (char**) malloc(
 				sizeof(char *) * (sortedColumnNum + 1));
 		regularRow.fields = customStrTok(regularRow.rowValue, sortedColumnNum);
 		//printf("Data 0: %s\n", regularRow.rowValue);
+		//printf("made it here: %s\n", regularRow.fields[currentRow]);
+
+		//printf("%s: %s\n", arg->fileName, regularRow.rowValue);
+		//printf("%d\n", currentRow);
 		data[currentRow++] = regularRow;
+		//count++;
+		//printf("%d\n", count);
 		//printf("Row Value: %d and Data: %s\n", currentRow -1, data[currentRow-1].rowValue);
 
 	}
 
 	numberOfRows = currentRow;
-	printf("Number of Rows: %d + Title Row\n", numberOfRows);
+	//printf("Number of Rows: %d + Title Row\n", numberOfRows);
 	//printf("size: %d\n", sizeof(data[0]));
-
-	return;
+	pthread_mutex_unlock(&m);
+	return NULL;
 
 }
 
-void traverseDirectory(char* dirName, char* selectedColumn, char* outputDir,
-		int depth, int dUsed, int oUsed) {
+void* traverseDirectory(void* args) {
+
+	struct dirArg_struct *arg = args;
+
+	if (firstTraverseCall != 0){
+		printf("%ld,",(unsigned long int)pthread_self());
+	}
+
+	firstTraverseCall = 1;
 
 	//printf("Searching through directory %s\n\n", dirName);
 	DIR *dir;
 	DIR *dir2;
 	struct dirent *ent;
-	if ((dir = opendir(dirName)) != NULL) {
+	if ((dir = opendir(arg->dirName)) != NULL) {
 		//printf("Curretly in dir %s\n", dirName);
 		/* print all the files and directories within directory */
 		while ((ent = readdir(dir)) != NULL) {
 
-			//wait(getppid());
 			char* itemName = ent->d_name;
-			//printf("%s\n", itemName);
 			int length = strlen(itemName);
-			int pid, pid2;
 			char* temp;
 
 			//CSV FILE FOUND
@@ -515,28 +563,23 @@ void traverseDirectory(char* dirName, char* selectedColumn, char* outputDir,
 					&& itemName[length - 4] == '.'
 					&& strstr(itemName, "sorted") == NULL) {
 
-				printf("Found CSV: %s\n", itemName);
-				numberOfRows--;
-
-
-				//pid = fork();
-//--------------------Create thread instead
-
-
-					(*shared)++;
-					temp = malloc(strlen(dirName) + strlen(itemName) + 4);
-					strcat(temp, dirName);
+				//printf("Found CSV: %s\n", itemName);
+					temp = malloc(strlen(arg->dirName) + strlen(itemName) + 4);
+					strcat(temp, arg->dirName);
 					strcat(temp, itemName);
-					//int pidt = getpid();
-//--------------------Print thread ID instead
-					//printf("%d,", 0);
-					fflush(stdout);
-					/*printf(
-							"New sorting process created with Process ID %d for file %s\n\n",
-							getpid(), temp);*/
-					printf("begin sort called\n");
 
-					beginSort(selectedColumn, temp, outputDir, depth, itemName, dUsed, oUsed);
+					fflush(stdout);
+
+					//printf("Calling begin sort and creating thread\n");
+
+					 pthread_t thr;
+					 struct arg_struct *args = malloc(sizeof(struct arg_struct));
+
+					 args->fileName = temp;
+
+					 pthread_create (&thr, NULL, beginSort, (void *)args);
+					  ++(*threadCount);
+					      arg->threads[*threadCount] = thr;
 
 
 			} else {
@@ -553,17 +596,17 @@ void traverseDirectory(char* dirName, char* selectedColumn, char* outputDir,
 
 				if (directory == 1) {
 
-					//printf("Potential directory found!\n");
+					//printf("Directory found!\n\n\n");
 
 					//(ent = readdir (dir)) != NULL)
 
 					//fix this
 					char* dirPath = malloc(
-							strlen(dirName) + strlen(itemName) + strlen("/")
+							strlen(arg->dirName) + strlen(itemName) + strlen("/")
 									+ 2);
 					dirPath[0] = '\0';
 					//strcat(dirPath, "./");
-					strcat(dirPath, dirName);
+					strcat(dirPath, arg->dirName);
 					//strcat(dirPath, "/");
 					strcat(dirPath, itemName);
 					strcat(dirPath, "/");
@@ -581,38 +624,27 @@ void traverseDirectory(char* dirName, char* selectedColumn, char* outputDir,
 						/*printf("\nDirectory found: %s in process: %d in dir %s\n",
 								dirPath, getpid(), dirName);*/
 
-						if (strstr(dirPath, outputDir) != NULL) {
+						if (strstr(dirPath, arg->outputDir) != NULL) {
 							sleep(1);
 						}
 
-						//pid2 = fork();
-						pid2 = 0;
-//--------------------Create thread2 instead
-						switch (pid2) {
-						case 0:
-							(*shared)++;
-							//int pidt = getpid();
-							printf("%d,", 0);
-//--------------------Print thread id instead
-							fflush(stdout);
-							/*printf(
-									"New directory traversal process created with Process ID %d\n\n",
-									getpid());*/
-							//wait();
 
-							traverseDirectory(dirPath, selectedColumn,
-									outputDir, depth + 1, dUsed, oUsed);
-							exit(0);
-							//return;
+						//printf("Calling begin sort and creating thread\n");
 
-						case -1:
-							perror("Error creating fork");
-							break;
+						pthread_t dirThr;
+						struct dirArg_struct *dirArgs = malloc(sizeof(struct dirArg_struct));
 
-						default:
-							//(*sortProcessCountPtr)++;
-							break;
-						}
+						dirArgs->dirName = dirPath;
+						dirArgs->selectedColumn = arg->selectedColumn;
+						dirArgs->outputDir = arg->outputDir;
+						dirArgs->depth = arg->depth;
+						dirArgs->dUsed = arg->dUsed;
+						dirArgs->oUsed = arg->oUsed;
+						dirArgs->threads = arg->threads;
+
+						pthread_create (&dirThr, NULL, traverseDirectory, (void *)dirArgs);
+						++(*threadCount);
+						arg->threads[*threadCount] = dirThr;
 
 					}
 
@@ -625,22 +657,34 @@ void traverseDirectory(char* dirName, char* selectedColumn, char* outputDir,
 		}
 
 		closedir(dir);
-		return;
+		return NULL;
 	} else {
 		/* could not open directory */
 		perror("");
-		return;
+		return NULL;
 	}
 
 }
 
 int main(int argc, char* argv[]) {
+
+	firstTraverseCall = 0;
+	ret = 0;
+	ret = pthread_mutex_init(&m, &mattr);
+
 	titleCompiled = 0;
+	threadCount = (int *)malloc(sizeof(int));
 	shared = mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE,
 			MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	numberOfRows = 0;
 
 	char* fileName;
+
+	 printf("Initial TID: %ld\n", (unsigned long int)pthread_self());
+	 printf("TIDS of all child threads: ");
+	  fflush(stdout);
+	  *threadCount = -1;
+	  pthread_t * threads = (pthread_t *)malloc(sizeof(pthread_t) * 2048);
 
 	//globla struct to store rows
 	data = (row*) malloc(sizeof(row) * 40000); //size matters
@@ -672,9 +716,7 @@ int main(int argc, char* argv[]) {
 
 
 		populateStructTitles("./", selectedColumn);
-
 		int columnToSort = 0;
-
 		while (columnToSort < titleRow.sortedColumnNum) {
 			if (strcmp(titleRow.fields[columnToSort], selectedColumn) == 0) {
 				break;
@@ -682,27 +724,43 @@ int main(int argc, char* argv[]) {
 			columnToSort++;
 		}
 
-		traverseDirectory("./", selectedColumn, "-n", depth, 0, 0);
+		struct dirArg_struct *dirArgs1 = malloc(sizeof(struct dirArg_struct));
 
+		dirArgs1->dirName = "./";
+		dirArgs1->selectedColumn = selectedColumn;
+		dirArgs1->outputDir = "-n";
+		dirArgs1->depth = depth;
+		dirArgs1->dUsed = 0;
+		dirArgs1->oUsed = 0;
+		dirArgs1->threads = threads;
+
+
+
+		traverseDirectory(dirArgs1);
+
+		 int counter = *threadCount;
+		    while(counter >= 0){
+		    	int* ret;
+
+		      pthread_join(threads[counter--], (void *)&ret);
+
+		    }
 
 		mergeSort(data, columnToSort, numberOfRows);
 
-
+		char* outputName = malloc(20 + strlen(selectedColumn) + 10);
+		outputName[0] = '\0';
+		strcat(outputName, "AllFiles-sorted-");
+		strcat(outputName, selectedColumn);
+		strcat(outputName, ".csv");
 
 		//AllFiles-sorted-<fieldname>.csv
-
 		fileName = "sortedFiles.csv";
-		exportToFile(selectedColumn, fileName, "-n", depth,
+		exportToFile(selectedColumn, outputName, "-n", depth,
 				 0, 0);
 
+		printf("\n\nTotal number of threads: %d\n", *threadCount + 1);
 
-
-		/*traverseDirectory("./", selectedColumn, "-n", depth, 0, 0);
-		if (initialPid == getpid()) {
-			wait();
-			printf("\nTotal number of processes: %d\n", *shared + 1);
-		}
-		exit(0);*/
 	}
 
 	if (argc == 5) {
@@ -725,7 +783,7 @@ int main(int argc, char* argv[]) {
 				strcat(startingPath, "/");
 			}
 
-			traverseDirectory(startingPath, selectedColumn, "-n", depth, 0, 0);
+			//traverseDirectory(startingPath, selectedColumn, "-n", depth, 0, 0);
 			/*if (initialPid == getpid()) {
 				wait();
 				printf("\nTotal number of processes: %d\n", *shared + 1);
@@ -755,7 +813,7 @@ int main(int argc, char* argv[]) {
 				return 0;
 			}
 
-			traverseDirectory("./", selectedColumn, outputDir, depth, 0, 1);
+			//traverseDirectory("./", selectedColumn, outputDir, depth, 0, 1);
 			/*if (initialPid == getpid()) {
 				wait();
 				printf("\nTotal number of processes: %d\n", *shared + 1);
@@ -817,7 +875,7 @@ int main(int argc, char* argv[]) {
 			//printf("starting path: %s\n", startingPath);
 			//printf("output dir: %s\n", outputDir);
 
-			traverseDirectory(startingPath, selectedColumn, outputDir, depth, 1, 1);
+			//traverseDirectory(startingPath, selectedColumn, outputDir, depth, 1, 1);
 		/*	if (initialPid == getpid()) {
 				wait();
 				printf("\nTotal number of processes: %d\n", *shared + 1);
