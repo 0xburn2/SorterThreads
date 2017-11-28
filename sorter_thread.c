@@ -641,9 +641,9 @@ void* traverseDirectory(void* args) {
 						/*printf("\nDirectory found: %s in process: %d in dir %s\n",
 								dirPath, getpid(), dirName);*/
 
-						if (strstr(dirPath, arg->outputDir) != NULL) {
+						/*if (strstr(dirPath, arg->outputDir) != NULL) {
 							sleep(1);
-						}
+						}*/
 
 
 						//printf("Calling begin sort and creating thread\n");
@@ -702,7 +702,7 @@ int main(int argc, char* argv[]) {
 	  pthread_t * threads = (pthread_t *)malloc(sizeof(pthread_t) * 2048);
 
 	//globla struct to store rows
-	data = (row*) malloc(sizeof(row) * 40000); //size matters
+	data = (row*) malloc(sizeof(row) * 52000000); //size matters
 
 	// column to sort by
 	char* selectedColumn;
@@ -917,6 +917,7 @@ int main(int argc, char* argv[]) {
 		printf("dirArgs selectedCoulmn: %s\n", dirArgs1->selectedColumn);*/
 
 		traverseDirectory(dirArgs1);
+		sleep(.5);
 
 		 int counter = *threadCount;
 		    while(counter >= 0){
@@ -925,6 +926,8 @@ int main(int argc, char* argv[]) {
 		      pthread_join(threads[counter--], (void *)&ret);
 
 		    }
+
+		    sleep(.5);
 
 
 		mergeSort(data, columnToSort, numberOfRows);
