@@ -13,14 +13,15 @@ Compile Command:
 gcc -pthread -o sorter_thread mergesort.c sorter_thread.c
 
 Execution Command:
-./sorter -c COLUMNNAME
+./sorter_thread -c COLUMNNAME
 
 Optional parameters
 -d DIR NAME (starts from the given directory)
 -o DIR NAME (outputs to the given directory)
+[Parameters can be entered in any order]
 
 Output:
-If successful, the sorted CSV files will be placed in the source directory, or if -o is given, in that directory. 
+If successful, one singled sorted CSV containing the contents from every discovered CSV file will be placed into the starting directory, or the output directory of -o was used
 Stdout will show process id's and total number of child processes created.
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -31,10 +32,13 @@ Work-Flow:
 The programs work flow is as follows:
 
 Run the logic to determine which parameters were used and if they were valid
+Call populateStructTitles() to populate the Title columns in the output CSV
 Call a method called traverseDirectory() that runs through the given directory item by item and determines if it is a CSV or if it is a directory.
 
-If CSV - it will run beginSort which runs the mergesort logic
+If CSV - it will run beginSort which will add all of the contents to a global data structure
 If Directory - it will call traverseDirectory() again on the found directory
+
+Then, mergesort is run on the global data structure and exported into a CSV
     
 Header File:
 In our header file, we have 3 important things (aside from the includes and the definitions). First is the struct that 
@@ -48,13 +52,14 @@ Additionally, we have defined the function definition for the mergesort() functi
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 DIFFICULTIES/ASSUMPTIONS:
--This was hard
--Most of the work was figuring out the fork logic and making it robust
+-This was also hard!
+-Most of the work was figuring out the thread logic and making it robust
 -Had to do some tricky string manipulation for appending/modifying directory paths in order to maintain robustness
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 TESTING PROCEDURE:
--We used the given 5,000 line CSV to test our code
--Tested various different parameter combination and inputs
+-Ran various testing using nested directories of length 0-16, and various different kinds of CSV sizes and types in different locations
+-Various testing for the flag parameters to be entered in any order, and to make sure they work under all conditions
+-Ran run-time analysises to compare this with project 1
 

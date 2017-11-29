@@ -581,7 +581,11 @@ void* traverseDirectory(void* args) {
 					&& strstr(itemName, "sorted") == NULL) {
 
 				//printf("Found CSV: %s\n", itemName);
+
+
+
 					temp = malloc(strlen(arg->dirName) + strlen(itemName) + 4);
+					temp[0] = '\0';
 					strcat(temp, arg->dirName);
 					strcat(temp, itemName);
 
@@ -593,6 +597,7 @@ void* traverseDirectory(void* args) {
 					 struct arg_struct *args = malloc(sizeof(struct arg_struct));
 
 					 args->fileName = temp;
+
 
 					 pthread_create (&thr, NULL, beginSort, (void *)args);
 					  ++(*threadCount);
@@ -917,7 +922,7 @@ int main(int argc, char* argv[]) {
 		printf("dirArgs selectedCoulmn: %s\n", dirArgs1->selectedColumn);*/
 
 		traverseDirectory(dirArgs1);
-		sleep(.5);
+		sleep(1);
 
 		 int counter = *threadCount;
 		    while(counter >= 0){
@@ -957,7 +962,7 @@ int main(int argc, char* argv[]) {
 				 dirArgs1->dUsed, dirArgs1->oUsed);
 		}
 
-		printf("\n\nTotal number of threads: %d\n", *threadCount + 1);
+		printf("\n\nTotal number of threads: %d\n", *threadCount + 2);
 
 	return 0;
 }
